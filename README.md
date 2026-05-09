@@ -1,37 +1,51 @@
-# Databricks Table Agent
+# Airline Flight Operations Lakehouse
 
-This helper is meant for a Databricks notebook or a Databricks Python file.
+Databricks and Delta Lake project for an airline flight operations analytics
+pipeline using Bronze, Silver, and Gold layers.
 
-It searches visible tables in Unity Catalog and returns the fully qualified
-table path in `catalog.schema.table` format.
+## Project Scope
 
-## Files
+This repo contains:
 
-- `databricks_table_agent.py`: notebook-friendly helper class
+- Lakehouse table DDL for Bronze, Silver, and Gold
+- Synthetic raw data in CSV and JSONL formats
+- A raw data generator aligned to the Bronze schema
+- Architecture documentation for high-level and low-level design
 
-## Use in a Databricks notebook
+## Repository Structure
 
-```python
-from databricks_table_agent import create_agent
+- `sql/ddl/`: Databricks DDL scripts
+- `data/raw/`: CSV raw source files
+- `data/raw_json/`: JSON Lines raw source files
+- `scripts/`: synthetic data generator
+- `docs/`: architecture and design documentation
 
-agent = create_agent(spark)
+## Main Design Artifacts
 
-# Return one best match
-best_match = agent.find_best_match("customers")
-print(best_match)
+- [Architecture and Schema Design](/Users/nileshs2002/Documents/New%20project/docs/airline_architecture_and_schema.md)
+- [SQL DDL Overview](/Users/nileshs2002/Documents/New%20project/sql/README.md)
+- [Synthetic Raw Data Notes](/Users/nileshs2002/Documents/New%20project/data/README.md)
 
-# Return multiple matches
-matches = agent.find_table("customers")
-for match in matches:
-    print(match.full_path, match.table_type)
+## Databricks Layers
 
-# Agent-style answer
-print(agent.answer("customers"))
-```
+- `airline_ops.bronze`: raw ingestion tables
+- `airline_ops.silver`: cleaned and conformed tables
+- `airline_ops.gold`: reporting-ready aggregate tables
 
-## Notes
+## Data Domains
 
-- Unity Catalog search uses `system.information_schema.tables`.
-- This only returns tables you have permission to view.
-- If you also want the legacy metastore, set
-  `include_hive_metastore=True`.
+- Flight operations
+- Airport reference
+- Aircraft reference
+- Weather observations
+
+## Reporting Targets
+
+The Gold layer is designed to support Power BI or Databricks SQL dashboards
+for:
+
+- on-time performance
+- route delay analysis
+- airport delay analysis
+- cancellation trends
+- aircraft performance
