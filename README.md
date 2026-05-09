@@ -28,6 +28,7 @@ This repo contains:
 - [Architecture and Schema Design](/Users/nileshs2002/Documents/Airline%20Project/docs/airline_architecture_and_schema.md)
 - [SQL DDL Overview](/Users/nileshs2002/Documents/Airline%20Project/sql/README.md)
 - [Synthetic Raw Data Notes](/Users/nileshs2002/Documents/Airline%20Project/data/README.md)
+- [Project Checklist](/Users/nileshs2002/Documents/Airline%20Project/PROJECT_CHECKLIST.md)
 
 ## Databricks Layers
 
