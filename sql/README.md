@@ -22,3 +22,10 @@ project on Databricks.
 Use `gold.on_time_performance_daily`, `gold.route_delay_summary`,
 `gold.airport_delay_summary`, `gold.cancellation_summary`, and
 `gold.aircraft_performance_summary` as the Power BI model sources.
+
+## Bronze ingestion helper
+
+After creating the Bronze tables, use
+[`databricks_bronze_ingestion.py`](/Users/nileshs2002/Documents/Airline%20Project/databricks_bronze_ingestion.py)
+from a Databricks notebook to load CSV, JSONL, or mixed raw sources into the
+Delta Bronze tables.
