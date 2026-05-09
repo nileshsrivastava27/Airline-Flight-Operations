@@ -1,0 +1,5 @@
+CREATE CATALOG IF NOT EXISTS airline_ops;
+
+CREATE SCHEMA IF NOT EXISTS airline_ops.bronze;
+CREATE SCHEMA IF NOT EXISTS airline_ops.silver;
+CREATE SCHEMA IF NOT EXISTS airline_ops.gold;
