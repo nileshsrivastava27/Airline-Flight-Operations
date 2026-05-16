@@ -20,7 +20,9 @@ This repo contains:
 - `data/raw_json/`: JSON Lines raw source files
 - `scripts/`: synthetic data generator
 - `bronze/`: notebook-ready Bronze ingestion examples
+- `silver/`: notebook-ready Silver transformation examples
 - `databricks_bronze_ingestion.py`: notebook-friendly Bronze ingestion helper
+- `databricks_silver_transformation.py`: notebook-friendly Silver transformation helper
 - `docs/`: architecture and design documentation
 
 ## Main Design Artifacts
@@ -64,6 +66,22 @@ display(results)
 For a direct notebook version with explicit `spark.read.format("csv")` and
 `spark.read.format("json")` ingestion cells, use
 [bronze_ingestion_notebook.py](/Users/nileshs2002/Documents/Airline%20Project/bronze/bronze_ingestion_notebook.py).
+
+## Silver Transformations
+
+Use [databricks_silver_transformation.py](/Users/nileshs2002/Documents/Airline%20Project/databricks_silver_transformation.py)
+from a Databricks notebook after Bronze tables are populated:
+
+```python
+from databricks_silver_transformation import SilverTransformationJob
+
+job = SilverTransformationJob(spark)
+results = job.run_all()
+display(results)
+```
+
+For a direct notebook version with Silver transformation cells, use
+[silver_transformation_notebook.py](/Users/nileshs2002/Documents/Airline%20Project/silver/silver_transformation_notebook.py).
 
 ## Reporting Targets
 

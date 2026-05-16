@@ -12,11 +12,12 @@
 - [x] Push current project foundation to private GitHub repo
 - [x] Build Bronze ingestion helper for CSV and JSONL
 - [x] Add notebook-ready Bronze ingestion example
+- [x] Create Silver transformation folder and starter logic
 
 ## Pending
 
 - [ ] Run Bronze ingestion in Databricks and validate row counts
-- [ ] Build Silver transformation layer
+- [ ] Run and validate Silver transformation layer in Databricks
 - [ ] Build quarantine and data quality logic
 - [ ] Build Gold aggregation layer
 - [ ] Create sample validation and reconciliation queries
