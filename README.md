@@ -21,8 +21,10 @@ This repo contains:
 - `scripts/`: synthetic data generator
 - `bronze/`: notebook-ready Bronze ingestion examples
 - `silver/`: notebook-ready Silver transformation examples
+- `gold/`: notebook-ready Gold transformation examples
 - `databricks_bronze_ingestion.py`: notebook-friendly Bronze ingestion helper
 - `databricks_silver_transformation.py`: notebook-friendly Silver transformation helper
+- `databricks_gold_transformation.py`: notebook-friendly Gold transformation helper
 - `docs/`: architecture and design documentation
 
 ## Main Design Artifacts
@@ -82,6 +84,37 @@ display(results)
 
 For a direct notebook version with Silver transformation cells, use
 [silver_transformation_notebook.py](/Users/nileshs2002/Documents/Airline%20Project/silver/silver_transformation_notebook.py).
+
+## Gold Transformations
+
+Use [databricks_gold_transformation.py](/Users/nileshs2002/Documents/Airline%20Project/databricks_gold_transformation.py)
+from a Databricks notebook after Silver tables are populated:
+
+```python
+from databricks_gold_transformation import GoldTransformationJob
+
+job = GoldTransformationJob(spark)
+results = job.run_all()
+display(results)
+```
+
+For a direct notebook version with Gold transformation cells, use
+[gold_transformation_notebook.py](/Users/nileshs2002/Documents/Airline%20Project/gold/gold_transformation_notebook.py).
+
+## Achieved So Far
+
+- Defined the airline flight operations Lakehouse use case and project scope
+- Created architecture documentation with both high-level and low-level design
+- Created Bronze, Silver, and Gold DDL scripts
+- Generated synthetic raw airline source data in both CSV and JSONL formats
+- Built reusable Bronze ingestion logic for Databricks
+- Added notebook-style Bronze ingestion code for Databricks Free Edition
+- Built Silver transformation logic for cleaned facts, reference tables, quarantine, and route derivation
+- Added schema-aligned Silver writes to reduce datatype mismatch issues during inserts
+- Built Gold transformation logic for on-time performance, route delay, airport delay, cancellation, and aircraft performance reporting
+- Added notebook-ready Bronze, Silver, and Gold execution entry points
+- Added lightweight unit tests for Bronze, Silver, and Gold modules
+- Structured the repository so it can be run through Databricks Repos and later connected to Power BI
 
 ## Reporting Targets
 

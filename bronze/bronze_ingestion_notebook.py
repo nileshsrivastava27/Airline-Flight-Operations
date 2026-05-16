@@ -9,12 +9,12 @@
 
 from pyspark.sql import functions as F
 
-project_root = "/Workspace/Repos/nileshsrivastava27/Airline-Flight-Operations"
+project_root = "/Workspace/Users/nileshsrivastava20@gmail.com/Airline-Flight-Operations"
 
-csv_root = f"{project_root}/data/raw"
-json_root = f"{project_root}/data/raw_json"
+csv_root = f"file:{project_root}/data/raw"
+json_root = f"file:{project_root}/data/raw_json"
 
-batch_id = "batch_20260510_001"
+batch_id = "batch_20260516_001"
 
 # COMMAND ----------
 
@@ -33,7 +33,7 @@ flight_csv_df = (
 flight_csv_df = (
     flight_csv_df.withColumn(
         "source_file_name",
-        F.regexp_extract(F.input_file_name(), r"([^/]+$)", 1),
+        F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1),
     )
     .withColumn("source_system", F.lit("synthetic_airline_ops"))
     .withColumn("ingestion_timestamp", F.current_timestamp())
@@ -58,7 +58,7 @@ flight_json_df = spark.read.format("json").load(f"{json_root}/flight_operations"
 flight_json_df = (
     flight_json_df.withColumn(
         "source_file_name",
-        F.regexp_extract(F.input_file_name(), r"([^/]+$)", 1),
+        F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1),
     )
     .withColumn("source_system", F.lit("synthetic_airline_ops"))
     .withColumn("ingestion_timestamp", F.current_timestamp())
@@ -88,7 +88,7 @@ airports_df = (
 airports_df = (
     airports_df.withColumn(
         "source_file_name",
-        F.regexp_extract(F.input_file_name(), r"([^/]+$)", 1),
+        F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1),
     )
     .withColumn("source_system", F.lit("synthetic_airports"))
     .withColumn("ingestion_timestamp", F.current_timestamp())
@@ -118,7 +118,7 @@ aircraft_df = (
 aircraft_df = (
     aircraft_df.withColumn(
         "source_file_name",
-        F.regexp_extract(F.input_file_name(), r"([^/]+$)", 1),
+        F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1),
     )
     .withColumn("source_system", F.lit("synthetic_aircraft"))
     .withColumn("ingestion_timestamp", F.current_timestamp())
@@ -143,7 +143,7 @@ weather_df = spark.read.format("json").load(f"{json_root}/weather_metar")
 weather_df = (
     weather_df.withColumn(
         "source_file_name",
-        F.regexp_extract(F.input_file_name(), r"([^/]+$)", 1),
+        F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1),
     )
     .withColumn("source_system", F.lit("synthetic_metar"))
     .withColumn("ingestion_timestamp", F.current_timestamp())
