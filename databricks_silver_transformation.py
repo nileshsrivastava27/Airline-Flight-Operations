@@ -399,21 +399,39 @@ class SilverTransformationJob:
             )
         )
 
-    def _write_dataframe(self, df: DataFrame, spec: SilverWriteSpec) -> dict[str, Any]:
-        if not self.spark.catalog.tableExists(spec.target_table):
+    def _align_to_target_table(
+        self,
+        df: DataFrame,
+        target_table: str,
+        identity_columns: tuple[str, ...] = (),
+    ) -> DataFrame:
+        from pyspark.sql import functions as F
+
+        if not self.spark.catalog.tableExists(target_table):
             raise ValueError(
-                f"Target table '{spec.target_table}' does not exist. Run the Silver DDL first."
+                f"Target table '{target_table}' does not exist. Run the Silver DDL first."
             )
 
-        target_columns = [
-            field.name
-            for field in self.spark.table(spec.target_table).schema.fields
-            if field.name not in spec.identity_columns
-        ]
+        target_schema = self.spark.table(target_table).schema
+        projected_columns = []
+        for field in target_schema.fields:
+            if field.name in identity_columns:
+                continue
+            if field.name in df.columns:
+                projected_columns.append(F.col(field.name).cast(field.dataType).alias(field.name))
+            else:
+                projected_columns.append(F.lit(None).cast(field.dataType).alias(field.name))
+        return df.select(*projected_columns)
 
-        staged_df = df.select(*target_columns)
+    def _write_dataframe(self, df: DataFrame, spec: SilverWriteSpec) -> dict[str, Any]:
+        staged_df = self._align_to_target_table(
+            df,
+            spec.target_table,
+            identity_columns=spec.identity_columns,
+        )
         staged_df.createOrReplaceTempView(spec.temp_view)
 
+        target_columns = staged_df.columns
         insert_sql = f"""
         INSERT INTO {spec.target_table} ({", ".join(target_columns)})
         SELECT {", ".join(target_columns)}

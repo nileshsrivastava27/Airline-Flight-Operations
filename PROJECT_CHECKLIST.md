@@ -13,13 +13,14 @@
 - [x] Build Bronze ingestion helper for CSV and JSONL
 - [x] Add notebook-ready Bronze ingestion example
 - [x] Create Silver transformation folder and starter logic
+- [x] Create Gold transformation folder and starter logic
 
 ## Pending
 
 - [ ] Run Bronze ingestion in Databricks and validate row counts
 - [ ] Run and validate Silver transformation layer in Databricks
 - [ ] Build quarantine and data quality logic
-- [ ] Build Gold aggregation layer
+- [ ] Run and validate Gold transformation layer in Databricks
 - [ ] Create sample validation and reconciliation queries
 - [ ] Create Databricks workflow design
 - [ ] Create Power BI dashboard
