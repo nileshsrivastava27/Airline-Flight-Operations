@@ -26,6 +26,7 @@ This repo contains:
 - `databricks_bronze_ingestion.py`: notebook-friendly Bronze ingestion helper
 - `databricks_silver_transformation.py`: notebook-friendly Silver transformation helper
 - `databricks_gold_transformation.py`: notebook-friendly Gold transformation helper
+- `databricks_pipeline_reliability.py`: shared rollback, audit, rerun, and schema-evolution helpers
 - `docs/`: architecture and design documentation
 
 ## Main Design Artifacts
@@ -52,7 +53,8 @@ This repo contains:
 ## Bronze Ingestion
 
 Use [databricks_bronze_ingestion.py](/Users/nileshs2002/Documents/Airline%20Project/databricks_bronze_ingestion.py)
-from a Databricks notebook after running the DDL scripts:
+from a Databricks notebook after running the DDL scripts, including
+`sql/ddl/005_create_audit_tables.sql`:
 
 ```python
 from databricks_bronze_ingestion import BronzeIngestionJob, build_default_dataset_specs
@@ -114,6 +116,10 @@ For a direct notebook version with Gold transformation cells, use
 - Built Silver transformation logic for cleaned facts, reference tables, quarantine, and route derivation
 - Added schema-aligned Silver writes to reduce datatype mismatch issues during inserts
 - Built Gold transformation logic for on-time performance, route delay, airport delay, cancellation, and aircraft performance reporting
+- Added rollback and recovery behavior for Bronze, Silver, and Gold write paths
+- Added Bronze schema evolution handling for new incoming columns
+- Added audit logging hooks for pipeline runs and table-level writes
+- Added idempotent rerun behavior for batch-based Bronze and Silver writes
 - Added notebook-ready Bronze, Silver, and Gold execution entry points
 - Added lightweight unit tests for Bronze, Silver, and Gold modules
 - Structured the repository so it can be run through Databricks Repos and later connected to Power BI

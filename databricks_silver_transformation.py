@@ -9,6 +9,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
+
+from databricks_pipeline_reliability import (
+    DEFAULT_AUDIT_TABLE,
+    PipelineAuditLogger,
+    delete_existing_batches,
+    extract_batch_ids,
+    get_current_table_version,
+    restore_table_version,
+)
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
@@ -25,10 +35,19 @@ class SilverWriteSpec:
 
 
 class SilverTransformationJob:
-    def __init__(self, spark: SparkSession):
+    def __init__(
+        self,
+        spark: SparkSession,
+        *,
+        pipeline_name: str = "silver_transformation",
+        audit_table: str = DEFAULT_AUDIT_TABLE,
+    ):
         self.spark = spark
+        self.pipeline_name = pipeline_name
+        self.audit_logger = PipelineAuditLogger(spark, audit_table)
 
-    def run_all(self) -> list[dict[str, Any]]:
+    def run_all(self, *, pipeline_run_id: str | None = None) -> list[dict[str, Any]]:
+        run_id = pipeline_run_id or str(uuid4())
         airports_df = self.transform_airports()
         aircraft_df = self.transform_aircraft_reference()
         weather_df = self.transform_weather_observations()
@@ -43,6 +62,7 @@ class SilverTransformationJob:
                     temp_view="silver_airports_clean_stage",
                     identity_columns=("airport_key",),
                 ),
+                pipeline_run_id=run_id,
             ),
             self._write_dataframe(
                 aircraft_df,
@@ -51,6 +71,7 @@ class SilverTransformationJob:
                     temp_view="silver_aircraft_reference_clean_stage",
                     identity_columns=("aircraft_key",),
                 ),
+                pipeline_run_id=run_id,
             ),
             self._write_dataframe(
                 weather_df,
@@ -59,6 +80,7 @@ class SilverTransformationJob:
                     temp_view="silver_weather_observations_clean_stage",
                     identity_columns=("weather_key",),
                 ),
+                pipeline_run_id=run_id,
             ),
             self._write_dataframe(
                 valid_flights_df,
@@ -67,6 +89,7 @@ class SilverTransformationJob:
                     temp_view="silver_flight_operations_clean_stage",
                     identity_columns=("flight_operation_key",),
                 ),
+                pipeline_run_id=run_id,
             ),
             self._write_dataframe(
                 quarantine_df,
@@ -75,6 +98,7 @@ class SilverTransformationJob:
                     temp_view="silver_flight_operations_quarantine_stage",
                     identity_columns=("quarantine_key",),
                 ),
+                pipeline_run_id=run_id,
             ),
             self._write_dataframe(
                 route_df,
@@ -83,6 +107,7 @@ class SilverTransformationJob:
                     temp_view="silver_route_reference_stage",
                     identity_columns=("route_key",),
                 ),
+                pipeline_run_id=run_id,
             ),
         ]
         return results
@@ -423,26 +448,72 @@ class SilverTransformationJob:
                 projected_columns.append(F.lit(None).cast(field.dataType).alias(field.name))
         return df.select(*projected_columns)
 
-    def _write_dataframe(self, df: DataFrame, spec: SilverWriteSpec) -> dict[str, Any]:
+    def _write_dataframe(
+        self,
+        df: DataFrame,
+        spec: SilverWriteSpec,
+        *,
+        pipeline_run_id: str,
+    ) -> dict[str, Any]:
+        stage_name = spec.target_table.split(".")[-1]
         staged_df = self._align_to_target_table(
             df,
             spec.target_table,
             identity_columns=spec.identity_columns,
         )
-        staged_df.createOrReplaceTempView(spec.temp_view)
+        batch_ids = extract_batch_ids(staged_df)
+        self.audit_logger.log_event(
+            pipeline_name=self.pipeline_name,
+            stage_name=stage_name,
+            target_table=spec.target_table,
+            run_id=pipeline_run_id,
+            batch_id=batch_ids[0] if batch_ids else None,
+            status="STARTED",
+            details={"batch_ids": list(batch_ids)},
+        )
 
-        target_columns = staged_df.columns
-        insert_sql = f"""
-        INSERT INTO {spec.target_table} ({", ".join(target_columns)})
-        SELECT {", ".join(target_columns)}
-        FROM {spec.temp_view}
-        """
-        self.spark.sql(insert_sql)
-
-        return {
-            "target_table": spec.target_table,
-            "rows_written": staged_df.count(),
-        }
+        previous_version = get_current_table_version(self.spark, spec.target_table)
+        try:
+            rows_removed = delete_existing_batches(self.spark, spec.target_table, batch_ids)
+            staged_df.createOrReplaceTempView(spec.temp_view)
+            target_columns = staged_df.columns
+            insert_sql = f"""
+            INSERT INTO {spec.target_table} ({", ".join(target_columns)})
+            SELECT {", ".join(target_columns)}
+            FROM {spec.temp_view}
+            """
+            self.spark.sql(insert_sql)
+            rows_written = staged_df.count()
+            self.audit_logger.log_event(
+                pipeline_name=self.pipeline_name,
+                stage_name=stage_name,
+                target_table=spec.target_table,
+                run_id=pipeline_run_id,
+                batch_id=batch_ids[0] if batch_ids else None,
+                status="SUCCESS",
+                rows_written=rows_written,
+                rows_removed=rows_removed,
+                details={"batch_ids": list(batch_ids)},
+            )
+            return {
+                "target_table": spec.target_table,
+                "rows_written": rows_written,
+                "rows_removed": rows_removed,
+            }
+        except Exception as exc:
+            restored_version = restore_table_version(self.spark, spec.target_table, previous_version)
+            self.audit_logger.log_event(
+                pipeline_name=self.pipeline_name,
+                stage_name=stage_name,
+                target_table=spec.target_table,
+                run_id=pipeline_run_id,
+                batch_id=batch_ids[0] if batch_ids else None,
+                status="FAILED",
+                restored_version=restored_version,
+                error_message=str(exc),
+                details={"batch_ids": list(batch_ids)},
+            )
+            raise
 
 
 def create_job(spark: SparkSession) -> SilverTransformationJob:
