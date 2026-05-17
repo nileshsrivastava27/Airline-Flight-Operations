@@ -9,6 +9,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Literal
+from uuid import uuid4
+
+from databricks_pipeline_reliability import (
+    DEFAULT_AUDIT_TABLE,
+    PipelineAuditLogger,
+    delete_existing_batches,
+    evolve_table_schema_for_dataframe,
+    extract_batch_ids,
+    get_current_table_version,
+    restore_table_version,
+)
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
@@ -30,6 +41,7 @@ class DatasetSpec:
     source_file_extension: str
     write_mode: str = "append"
     options: dict[str, str] = field(default_factory=dict)
+    allow_schema_evolution: bool = True
 
 
 def normalize_source_format(source_format: str) -> str:
@@ -135,44 +147,102 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
 
 
 class BronzeIngestionJob:
-    """
-    Load raw source files into Delta Bronze tables.
-
-    Usage in Databricks notebook:
-
-        from databricks_bronze_ingestion import BronzeIngestionJob, build_default_dataset_specs
-
-        specs = build_default_dataset_specs("/Workspace/Repos/you/Airline-Flight-Operations", "mixed")
-        job = BronzeIngestionJob(spark)
-        results = job.ingest_all(specs, batch_id="batch_20260510_001")
-        display(results)
-    """
-
-    def __init__(self, spark: SparkSession):
+    def __init__(
+        self,
+        spark: SparkSession,
+        *,
+        pipeline_name: str = "bronze_ingestion",
+        audit_table: str = DEFAULT_AUDIT_TABLE,
+    ):
         self.spark = spark
+        self.pipeline_name = pipeline_name
+        self.audit_logger = PipelineAuditLogger(spark, audit_table)
 
-    def ingest_all(self, specs: Iterable[DatasetSpec], *, batch_id: str | None = None) -> list[dict[str, Any]]:
-        return [self.ingest_dataset(spec, batch_id=batch_id) for spec in specs]
+    def ingest_all(
+        self,
+        specs: Iterable[DatasetSpec],
+        *,
+        batch_id: str | None = None,
+        pipeline_run_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        run_id = pipeline_run_id or str(uuid4())
+        return [self.ingest_dataset(spec, batch_id=batch_id, pipeline_run_id=run_id) for spec in specs]
 
-    def ingest_dataset(self, spec: DatasetSpec, *, batch_id: str | None = None) -> dict[str, Any]:
-        source_df = self._read_source(spec)
-        enriched_df = self._apply_metadata(source_df, spec, batch_id=batch_id)
-        aligned_df = self._align_to_target_table(enriched_df, spec.target_table)
-        row_count = aligned_df.count()
-        (
-            aligned_df.write.format("delta")
-            .mode(spec.write_mode)
-            .option("mergeSchema", "false")
-            .saveAsTable(spec.target_table)
+    def ingest_dataset(
+        self,
+        spec: DatasetSpec,
+        *,
+        batch_id: str | None = None,
+        pipeline_run_id: str | None = None,
+    ) -> dict[str, Any]:
+        run_id = pipeline_run_id or str(uuid4())
+        stage_name = spec.name
+        self.audit_logger.log_event(
+            pipeline_name=self.pipeline_name,
+            stage_name=stage_name,
+            target_table=spec.target_table,
+            run_id=run_id,
+            batch_id=batch_id,
+            status="STARTED",
+            details={"source_path": spec.source_path, "source_format": spec.source_format},
         )
-        return {
-            "dataset": spec.name,
-            "source_path": spec.source_path,
-            "source_format": spec.source_format,
-            "target_table": spec.target_table,
-            "rows_written": row_count,
-            "write_mode": spec.write_mode,
-        }
+
+        previous_version = get_current_table_version(self.spark, spec.target_table)
+        try:
+            source_df = self._read_source(spec)
+            enriched_df = self._apply_metadata(source_df, spec, batch_id=batch_id)
+            evolved_columns = []
+            if spec.allow_schema_evolution:
+                evolved_columns = evolve_table_schema_for_dataframe(
+                    self.spark,
+                    spec.target_table,
+                    enriched_df,
+                    protected_columns=("_metadata",),
+                )
+            aligned_df = self._align_to_target_table(enriched_df, spec.target_table)
+            batch_ids = extract_batch_ids(aligned_df)
+            rows_removed = delete_existing_batches(self.spark, spec.target_table, batch_ids)
+            row_count = aligned_df.count()
+            (
+                aligned_df.write.format("delta")
+                .mode(spec.write_mode)
+                .option("mergeSchema", "false")
+                .saveAsTable(spec.target_table)
+            )
+            self.audit_logger.log_event(
+                pipeline_name=self.pipeline_name,
+                stage_name=stage_name,
+                target_table=spec.target_table,
+                run_id=run_id,
+                batch_id=batch_id,
+                status="SUCCESS",
+                rows_written=row_count,
+                rows_removed=rows_removed,
+                details={"evolved_columns": evolved_columns, "batch_ids": list(batch_ids)},
+            )
+            return {
+                "dataset": spec.name,
+                "source_path": spec.source_path,
+                "source_format": spec.source_format,
+                "target_table": spec.target_table,
+                "rows_written": row_count,
+                "rows_removed": rows_removed,
+                "write_mode": spec.write_mode,
+                "evolved_columns": evolved_columns,
+            }
+        except Exception as exc:
+            restored_version = restore_table_version(self.spark, spec.target_table, previous_version)
+            self.audit_logger.log_event(
+                pipeline_name=self.pipeline_name,
+                stage_name=stage_name,
+                target_table=spec.target_table,
+                run_id=run_id,
+                batch_id=batch_id,
+                status="FAILED",
+                restored_version=restored_version,
+                error_message=str(exc),
+            )
+            raise
 
     def _read_source(self, spec: DatasetSpec) -> DataFrame:
         reader = self.spark.read.format(normalize_source_format(spec.source_format))
@@ -191,7 +261,7 @@ class BronzeIngestionJob:
     ) -> DataFrame:
         from pyspark.sql import functions as F
 
-        file_name_expr = F.regexp_extract(F.input_file_name(), r"([^/]+$)", 1)
+        file_name_expr = F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1)
 
         if "source_file_name" in df.columns:
             df = df.withColumn(
@@ -224,10 +294,7 @@ class BronzeIngestionJob:
             df = df.withColumn("ingestion_timestamp", F.current_timestamp())
 
         if batch_id:
-            if "batch_id" in df.columns:
-                df = df.withColumn("batch_id", F.lit(batch_id))
-            else:
-                df = df.withColumn("batch_id", F.lit(batch_id))
+            df = df.withColumn("batch_id", F.lit(batch_id))
 
         return df
 

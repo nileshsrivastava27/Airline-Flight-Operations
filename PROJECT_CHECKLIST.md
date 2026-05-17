@@ -29,12 +29,12 @@
 
 ## Reliability and Change Handling
 
-- [ ] Add rollback / recovery mechanism for failed jobs
-- [ ] Add schema evolution handling for incoming column additions
-- [ ] Add audit logging for each pipeline run
-- [ ] Add idempotent re-run behavior for Bronze ingestion
+- [x] Add rollback / recovery mechanism for failed jobs
+- [x] Add schema evolution handling for incoming column additions
+- [x] Add audit logging for each pipeline run
+- [x] Add idempotent re-run behavior for Bronze ingestion
 - [ ] Add row-count and data-quality gate checks between layers
-- [ ] Add failure alerting / error reporting strategy
+- [x] Add failure alerting / error reporting strategy
 
 ## Optional
 
