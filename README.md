@@ -22,6 +22,7 @@ This repo contains:
 - `bronze/`: notebook-ready Bronze ingestion examples
 - `silver/`: notebook-ready Silver transformation examples
 - `gold/`: notebook-ready Gold transformation examples
+- `validation/`: SQL validation checks for Bronze, Silver, and Gold
 - `databricks_bronze_ingestion.py`: notebook-friendly Bronze ingestion helper
 - `databricks_silver_transformation.py`: notebook-friendly Silver transformation helper
 - `databricks_gold_transformation.py`: notebook-friendly Gold transformation helper
@@ -33,6 +34,7 @@ This repo contains:
 - [SQL DDL Overview](/Users/nileshs2002/Documents/Airline%20Project/sql/README.md)
 - [Synthetic Raw Data Notes](/Users/nileshs2002/Documents/Airline%20Project/data/README.md)
 - [Project Checklist](/Users/nileshs2002/Documents/Airline%20Project/PROJECT_CHECKLIST.md)
+- [Validation SQL](/Users/nileshs2002/Documents/Airline%20Project/validation/README.md)
 
 ## Databricks Layers
 
@@ -115,6 +117,10 @@ For a direct notebook version with Gold transformation cells, use
 - Added notebook-ready Bronze, Silver, and Gold execution entry points
 - Added lightweight unit tests for Bronze, Silver, and Gold modules
 - Structured the repository so it can be run through Databricks Repos and later connected to Power BI
+
+## Validation
+
+Use the SQL files in [validation/README.md](/Users/nileshs2002/Documents/Airline%20Project/validation/README.md) to verify Bronze, Silver, and Gold outputs after each layer runs.
 
 ## Reporting Targets
 
