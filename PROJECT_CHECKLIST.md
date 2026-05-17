@@ -21,7 +21,7 @@
 - [ ] Run and validate Silver transformation layer in Databricks
 - [ ] Build quarantine and data quality logic
 - [ ] Run and validate Gold transformation layer in Databricks
-- [ ] Create sample validation and reconciliation queries
+- [x] Create sample validation and reconciliation queries
 - [ ] Create Databricks workflow design
 - [ ] Create Power BI dashboard
 - [ ] Capture project screenshots and proof for resume/GitHub
