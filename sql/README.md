@@ -7,6 +7,7 @@ project on Databricks.
 
 - `ddl/001_create_schemas.sql`: creates catalog and schemas
 - `ddl/005_create_audit_tables.sql`: creates audit schema and pipeline run log table
+- `ddl/006_create_rejected_tables.sql`: creates Bronze rejected-records tables for rescued rows
 - `ddl/010_bronze_tables.sql`: raw ingestion tables
 - `ddl/020_silver_tables.sql`: cleaned and conformed tables
 - `ddl/030_gold_tables.sql`: reporting tables for dashboards
@@ -26,7 +27,7 @@ Use `gold.on_time_performance_daily`, `gold.route_delay_summary`,
 
 ## Bronze ingestion helper
 
-After creating the Bronze tables and audit table, use
+After creating the Bronze tables, audit table, and rejected-records tables, use
 [`databricks_bronze_ingestion.py`](/Users/nileshs2002/Documents/Airline%20Project/databricks_bronze_ingestion.py)
 from a Databricks notebook to load CSV, JSONL, or mixed raw sources into the
 Delta Bronze tables.
