@@ -17,6 +17,7 @@ else:
 
 
 DEFAULT_AUDIT_TABLE = "airline_ops.audit.pipeline_run_log"
+DEFAULT_RESCUED_COLUMN = "_rescued_data"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class PipelineAuditLogger:
         status: str,
         rows_written: int | None = None,
         rows_removed: int | None = None,
+        rows_rescued: int | None = None,
         restored_version: int | None = None,
         error_message: str | None = None,
         details: dict[str, Any] | None = None,
@@ -59,6 +61,7 @@ class PipelineAuditLogger:
             "status": status,
             "rows_written": rows_written,
             "rows_removed": rows_removed,
+            "rows_rescued": rows_rescued,
             "restored_version": restored_version,
             "error_message": error_message,
             "details": json.dumps(details, sort_keys=True) if details else None,
@@ -79,6 +82,37 @@ def restore_table_version(spark: SparkSession, table_name: str, version: int | N
         return None
     spark.sql(f"RESTORE TABLE {table_name} TO VERSION AS OF {version}")
     return version
+
+
+def split_rescued_records(
+    df: DataFrame,
+    rescued_column: str = DEFAULT_RESCUED_COLUMN,
+) -> tuple[DataFrame, DataFrame]:
+    """Split a freshly read source DataFrame into clean and rescued rows.
+
+    When a Databricks reader is configured with ``rescuedDataColumn``, any
+    values that do not fit the expected schema (type mismatches, unexpected
+    extra fields, unparseable content) are collected into that column instead
+    of silently dropping or failing the whole read.
+
+    Returns a tuple of ``(clean_df, rescued_df)`` where:
+    - ``clean_df`` has the rescued column removed and contains only rows whose
+      rescued column is null.
+    - ``rescued_df`` retains the rescued column and contains only the rows that
+      had non-null rescued content.
+
+    If the rescued column is not present (for example when rescue capture is
+    disabled or unsupported for the source), the input is treated as fully
+    clean and an empty rescued DataFrame is returned.
+    """
+    from pyspark.sql import functions as F
+
+    if rescued_column not in df.columns:
+        return df, df.limit(0)
+
+    clean_df = df.filter(F.col(rescued_column).isNull()).drop(rescued_column)
+    rescued_df = df.filter(F.col(rescued_column).isNotNull())
+    return clean_df, rescued_df
 
 
 def extract_batch_ids(df: DataFrame) -> tuple[str, ...]:
@@ -137,4 +171,3 @@ def evolve_table_schema_for_dataframe(
     )
     spark.sql(f"ALTER TABLE {table_name} ADD COLUMNS ({column_defs})")
     return [field.name for field in new_fields]
-

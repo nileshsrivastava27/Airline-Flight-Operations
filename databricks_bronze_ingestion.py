@@ -3,6 +3,14 @@ Notebook-friendly Bronze ingestion helper for Databricks.
 
 This module loads raw CSV or JSONL source files into Delta Bronze tables for
 the airline flight operations Lakehouse project.
+
+Reliability behaviour:
+- Rows that do not fit the expected schema are captured via Databricks'
+  ``rescuedDataColumn`` and routed to a per-dataset ``*_rejected`` table
+  instead of being silently dropped or failing the whole load.
+- Each ingestion captures the Delta version of both the target table and the
+  rejected table beforehand and restores both on failure, so a failed run
+  leaves no partial writes behind.
 """
 
 from __future__ import annotations
@@ -13,12 +21,14 @@ from uuid import uuid4
 
 from databricks_pipeline_reliability import (
     DEFAULT_AUDIT_TABLE,
+    DEFAULT_RESCUED_COLUMN,
     PipelineAuditLogger,
     delete_existing_batches,
     evolve_table_schema_for_dataframe,
     extract_batch_ids,
     get_current_table_version,
     restore_table_version,
+    split_rescued_records,
 )
 
 if TYPE_CHECKING:
@@ -42,6 +52,9 @@ class DatasetSpec:
     write_mode: str = "append"
     options: dict[str, str] = field(default_factory=dict)
     allow_schema_evolution: bool = True
+    rejected_table: str | None = None
+    rescued_column: str = DEFAULT_RESCUED_COLUMN
+    capture_rescued: bool = True
 
 
 def normalize_source_format(source_format: str) -> str:
@@ -51,6 +64,13 @@ def normalize_source_format(source_format: str) -> str:
     if cleaned in {"csv", "json"}:
         return cleaned
     raise ValueError(f"Unsupported source format: {source_format}")
+
+
+def _rejected_table_for(target_table: str) -> str:
+    """Derive the rejected-records table name from a Bronze target table."""
+    if target_table.endswith("_raw"):
+        return target_table[: -len("_raw")] + "_rejected"
+    return target_table + "_rejected"
 
 
 def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed") -> list[DatasetSpec]:
@@ -66,6 +86,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 source_system="synthetic_airline_ops",
                 source_file_extension=".csv",
                 options={"header": "true", "inferSchema": "true"},
+                rejected_table="airline_ops.bronze.flight_operations_rejected",
             ),
             DatasetSpec(
                 name="airports_raw",
@@ -75,6 +96,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 source_system="synthetic_airports",
                 source_file_extension=".csv",
                 options={"header": "true", "inferSchema": "true"},
+                rejected_table="airline_ops.bronze.airports_rejected",
             ),
             DatasetSpec(
                 name="aircraft_reference_raw",
@@ -84,6 +106,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 source_system="synthetic_aircraft",
                 source_file_extension=".csv",
                 options={"header": "true", "inferSchema": "true"},
+                rejected_table="airline_ops.bronze.aircraft_reference_rejected",
             ),
             DatasetSpec(
                 name="weather_metar_raw",
@@ -93,6 +116,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 source_system="synthetic_metar",
                 source_file_extension=".csv",
                 options={"header": "true", "inferSchema": "true"},
+                rejected_table="airline_ops.bronze.weather_metar_rejected",
             ),
         ]
 
@@ -106,6 +130,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.flight_operations_raw",
                 source_system="synthetic_airline_ops",
                 source_file_extension=".jsonl",
+                rejected_table="airline_ops.bronze.flight_operations_rejected",
             ),
             DatasetSpec(
                 name="airports_raw",
@@ -114,6 +139,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.airports_raw",
                 source_system="synthetic_airports",
                 source_file_extension=".jsonl",
+                rejected_table="airline_ops.bronze.airports_rejected",
             ),
             DatasetSpec(
                 name="aircraft_reference_raw",
@@ -122,6 +148,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.aircraft_reference_raw",
                 source_system="synthetic_aircraft",
                 source_file_extension=".jsonl",
+                rejected_table="airline_ops.bronze.aircraft_reference_rejected",
             ),
             DatasetSpec(
                 name="weather_metar_raw",
@@ -130,6 +157,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.weather_metar_raw",
                 source_system="synthetic_metar",
                 source_file_extension=".jsonl",
+                rejected_table="airline_ops.bronze.weather_metar_rejected",
             ),
         ]
 
@@ -188,16 +216,29 @@ class BronzeIngestionJob:
         )
 
         previous_version = get_current_table_version(self.spark, spec.target_table)
+        rejected_previous_version = (
+            get_current_table_version(self.spark, spec.rejected_table)
+            if spec.rejected_table
+            else None
+        )
         try:
             source_df = self._read_source(spec)
-            enriched_df = self._apply_metadata(source_df, spec, batch_id=batch_id)
+
+            # Separate rows that did not fit the schema (rescued) from clean rows.
+            clean_df, rescued_df = split_rescued_records(source_df, spec.rescued_column)
+
+            rows_rescued = 0
+            if spec.capture_rescued and spec.rejected_table:
+                rows_rescued = self._write_rejected(rescued_df, spec, batch_id=batch_id)
+
+            enriched_df = self._apply_metadata(clean_df, spec, batch_id=batch_id)
             evolved_columns = []
             if spec.allow_schema_evolution:
                 evolved_columns = evolve_table_schema_for_dataframe(
                     self.spark,
                     spec.target_table,
                     enriched_df,
-                    protected_columns=("_metadata",),
+                    protected_columns=("_metadata", spec.rescued_column),
                 )
             aligned_df = self._align_to_target_table(enriched_df, spec.target_table)
             batch_ids = extract_batch_ids(aligned_df)
@@ -218,7 +259,12 @@ class BronzeIngestionJob:
                 status="SUCCESS",
                 rows_written=row_count,
                 rows_removed=rows_removed,
-                details={"evolved_columns": evolved_columns, "batch_ids": list(batch_ids)},
+                rows_rescued=rows_rescued,
+                details={
+                    "evolved_columns": evolved_columns,
+                    "batch_ids": list(batch_ids),
+                    "rejected_table": spec.rejected_table,
+                },
             )
             return {
                 "dataset": spec.name,
@@ -227,11 +273,20 @@ class BronzeIngestionJob:
                 "target_table": spec.target_table,
                 "rows_written": row_count,
                 "rows_removed": rows_removed,
+                "rows_rescued": rows_rescued,
+                "rejected_table": spec.rejected_table,
                 "write_mode": spec.write_mode,
                 "evolved_columns": evolved_columns,
             }
         except Exception as exc:
+            # Revert both the target table and the rejected table so a failed
+            # run leaves every affected table in its original state.
             restored_version = restore_table_version(self.spark, spec.target_table, previous_version)
+            restored_rejected_version = None
+            if spec.rejected_table:
+                restored_rejected_version = restore_table_version(
+                    self.spark, spec.rejected_table, rejected_previous_version
+                )
             self.audit_logger.log_event(
                 pipeline_name=self.pipeline_name,
                 stage_name=stage_name,
@@ -241,16 +296,64 @@ class BronzeIngestionJob:
                 status="FAILED",
                 restored_version=restored_version,
                 error_message=str(exc),
+                details={"restored_rejected_version": restored_rejected_version},
             )
             raise
 
     def _read_source(self, spec: DatasetSpec) -> DataFrame:
         reader = self.spark.read.format(normalize_source_format(spec.source_format))
+        if spec.capture_rescued:
+            # Collect schema-mismatching values into the rescued column rather
+            # than dropping them or aborting the read.
+            reader = reader.option("rescuedDataColumn", spec.rescued_column)
         for key, value in spec.options.items():
             reader = reader.option(key, value)
         if normalize_source_format(spec.source_format) == "json":
             reader = reader.option("multiLine", "false")
         return reader.load(spec.source_path)
+
+    def _write_rejected(
+        self,
+        rescued_df: DataFrame,
+        spec: DatasetSpec,
+        *,
+        batch_id: str | None = None,
+    ) -> int:
+        from pyspark.sql import functions as F
+
+        if rescued_df is None:
+            return 0
+
+        rescued_count = rescued_df.count()
+        if rescued_count == 0:
+            return 0
+
+        # If the rejected sink has not been created yet, still surface the count
+        # rather than failing the whole load over a missing optional table.
+        if not self.spark.catalog.tableExists(spec.rejected_table):
+            return rescued_count
+
+        file_name_expr = F.regexp_extract(F.col("_metadata.file_path"), r"([^/]+$)", 1)
+        payload_columns = [c for c in rescued_df.columns if c != spec.rescued_column]
+
+        rejected_records = rescued_df.select(
+            F.lit(spec.target_table).alias("source_table"),
+            F.lit(spec.source_system).alias("source_system"),
+            file_name_expr.alias("source_file_name"),
+            F.col(spec.rescued_column).cast("string").alias("rescued_data"),
+            F.to_json(F.struct(*payload_columns)).alias("raw_payload"),
+            F.lit(batch_id).alias("batch_id"),
+            F.current_timestamp().alias("rejection_timestamp"),
+        )
+
+        aligned_rejected = self._align_to_target_table(rejected_records, spec.rejected_table)
+        (
+            aligned_rejected.write.format("delta")
+            .mode("append")
+            .option("mergeSchema", "false")
+            .saveAsTable(spec.rejected_table)
+        )
+        return rescued_count
 
     def _apply_metadata(
         self,
