@@ -131,7 +131,7 @@ class StreamingIngestionJob:
             StreamingSourceSpec(
                 name="flight_events",
                 source_mode=mode,
-                target_table="flight_delay.bronze.flight_events_raw",
+                target_table="airline_ops.bronze.flight_events_raw",
                 schema=FLIGHT_EVENT_SCHEMA,
                 kafka_topic=self._config.flight_events_topic,
                 kafka_bootstrap_servers=self._config.kafka_bootstrap_servers,
@@ -144,7 +144,7 @@ class StreamingIngestionJob:
             StreamingSourceSpec(
                 name="weather_updates",
                 source_mode=mode,
-                target_table="flight_delay.bronze.weather_updates_raw",
+                target_table="airline_ops.bronze.weather_updates_raw",
                 schema=WEATHER_UPDATE_SCHEMA,
                 kafka_topic=self._config.weather_updates_topic,
                 kafka_bootstrap_servers=self._config.kafka_bootstrap_servers,

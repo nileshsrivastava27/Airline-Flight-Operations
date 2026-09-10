@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- Flight events from Kafka / Auto Loader
-CREATE TABLE IF NOT EXISTS flight_delay.bronze.flight_events_raw (
+CREATE TABLE IF NOT EXISTS airline_ops.bronze.flight_events_raw (
     event_id                STRING          COMMENT 'Unique event identifier',
     flight_id               STRING          COMMENT 'Flight instance identifier',
     flight_number           STRING          COMMENT 'Airline flight number (e.g., DL302)',
@@ -42,7 +42,7 @@ TBLPROPERTIES (
 
 
 -- Weather updates from Kafka / Auto Loader
-CREATE TABLE IF NOT EXISTS flight_delay.bronze.weather_updates_raw (
+CREATE TABLE IF NOT EXISTS airline_ops.bronze.weather_updates_raw (
     observation_id          STRING          COMMENT 'Unique observation identifier',
     station_id              STRING          COMMENT 'Weather station / airport IATA code',
     observation_time        TIMESTAMP       COMMENT 'Time of weather observation',

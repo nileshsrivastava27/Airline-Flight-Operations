@@ -68,7 +68,7 @@ class StreamingGoldJob:
             self._spark
             .readStream
             .format("delta")
-            .table("flight_delay.silver.flight_events_clean")
+            .table("airline_ops.silver.flight_events_clean")
         )
 
         watermarked = events.withWatermark(
@@ -121,7 +121,7 @@ class StreamingGoldJob:
         row_count = latest_per_flight.count()
 
         try:
-            target_table = "flight_delay.gold.realtime_flight_status"
+            target_table = "airline_ops.gold.realtime_flight_status"
 
             if self._spark.catalog.tableExists(target_table):
                 delta_table = DeltaTable.forName(self._spark, target_table)
@@ -192,7 +192,7 @@ class StreamingGoldJob:
             self._logger.log_event(
                 pipeline_name=self._config.pipeline_name,
                 stage_name="flight_status_merge",
-                target_table="flight_delay.gold.realtime_flight_status",
+                target_table="airline_ops.gold.realtime_flight_status",
                 run_id=self._config.pipeline_run_id,
                 batch_id=micro_batch_id,
                 status="FAILED",
@@ -207,7 +207,7 @@ class StreamingGoldJob:
             self._spark
             .readStream
             .format("delta")
-            .table("flight_delay.silver.flight_events_clean")
+            .table("airline_ops.silver.flight_events_clean")
         )
 
         watermarked = flight_events.withWatermark(
@@ -305,7 +305,7 @@ class StreamingGoldJob:
         row_count = airport_metrics.count()
 
         try:
-            target_table = "flight_delay.gold.realtime_airport_operations"
+            target_table = "airline_ops.gold.realtime_airport_operations"
 
             if self._spark.catalog.tableExists(target_table):
                 delta_table = DeltaTable.forName(self._spark, target_table)
@@ -359,7 +359,7 @@ class StreamingGoldJob:
             self._logger.log_event(
                 pipeline_name=self._config.pipeline_name,
                 stage_name="airport_operations_merge",
-                target_table="flight_delay.gold.realtime_airport_operations",
+                target_table="airline_ops.gold.realtime_airport_operations",
                 run_id=self._config.pipeline_run_id,
                 batch_id=micro_batch_id,
                 status="FAILED",
