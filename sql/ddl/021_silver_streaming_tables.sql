@@ -3,7 +3,7 @@
 -- Cleaned and deduplicated streaming events
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS flight_delay.silver.flight_events_clean (
+CREATE TABLE IF NOT EXISTS airline_ops.silver.flight_events_clean (
     flight_event_key        BIGINT          GENERATED ALWAYS AS IDENTITY,
     event_id                STRING          NOT NULL    COMMENT 'Unique event identifier',
     flight_id               STRING          NOT NULL    COMMENT 'Flight instance identifier',
@@ -36,7 +36,7 @@ TBLPROPERTIES (
 );
 
 
-CREATE TABLE IF NOT EXISTS flight_delay.silver.weather_updates_clean (
+CREATE TABLE IF NOT EXISTS airline_ops.silver.weather_updates_clean (
     weather_update_key      BIGINT          GENERATED ALWAYS AS IDENTITY,
     observation_id          STRING          NOT NULL    COMMENT 'Unique observation identifier',
     station_id              STRING          NOT NULL    COMMENT 'Weather station / airport IATA code',

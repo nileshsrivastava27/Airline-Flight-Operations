@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- Real-time flight status: one row per active flight, continuously updated
-CREATE TABLE IF NOT EXISTS flight_delay.gold.realtime_flight_status (
+CREATE TABLE IF NOT EXISTS airline_ops.gold.realtime_flight_status (
     flight_id               STRING          NOT NULL    COMMENT 'Flight instance identifier',
     flight_number           STRING          NOT NULL    COMMENT 'Airline flight number',
     airline                 STRING          NOT NULL    COMMENT 'IATA airline code',
@@ -34,7 +34,7 @@ TBLPROPERTIES (
 
 
 -- Real-time airport operations: aggregated view per airport
-CREATE TABLE IF NOT EXISTS flight_delay.gold.realtime_airport_operations (
+CREATE TABLE IF NOT EXISTS airline_ops.gold.realtime_airport_operations (
     airport_code            STRING          NOT NULL    COMMENT 'Airport IATA code',
     snapshot_time           TIMESTAMP       NOT NULL    COMMENT 'When this snapshot was computed',
     total_departures        INT             DEFAULT 0   COMMENT 'Total departures in window',
