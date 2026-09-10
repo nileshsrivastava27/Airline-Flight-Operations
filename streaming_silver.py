@@ -69,7 +69,7 @@ class StreamingSilverJob:
             self._spark
             .readStream
             .format("delta")
-            .table("flight_delay.bronze.flight_events_raw")
+            .table("airline_ops.bronze.flight_events_raw")
         )
 
         watermarked = raw.withWatermark("event_time", self._config.watermark_delay_flight)
@@ -80,7 +80,7 @@ class StreamingSilverJob:
             cleaned = self._transform_flight_events(batch_df)
             self._write_batch(
                 cleaned, batch_id,
-                target_table="flight_delay.silver.flight_events_clean",
+                target_table="airline_ops.silver.flight_events_clean",
                 stream_name="flight_events",
             )
 
@@ -149,7 +149,7 @@ class StreamingSilverJob:
             self._spark
             .readStream
             .format("delta")
-            .table("flight_delay.bronze.weather_updates_raw")
+            .table("airline_ops.bronze.weather_updates_raw")
         )
 
         watermarked = raw.withWatermark(
@@ -162,7 +162,7 @@ class StreamingSilverJob:
             cleaned = self._transform_weather_updates(batch_df)
             self._write_batch(
                 cleaned, batch_id,
-                target_table="flight_delay.silver.weather_updates_clean",
+                target_table="airline_ops.silver.weather_updates_clean",
                 stream_name="weather_updates",
             )
 
