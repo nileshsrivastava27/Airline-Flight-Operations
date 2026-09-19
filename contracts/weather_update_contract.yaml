@@ -1,0 +1,86 @@
+contract:
+  name: weather_update
+  version: "1.0"
+  description: "Data contract for streaming weather observations (METAR)"
+  owner: data-engineering
+  source_system: streaming_weather
+
+schema:
+  fields:
+    - name: observation_id
+      type: string
+      required: true
+      description: "Unique observation identifier"
+
+    - name: station_id
+      type: string
+      required: true
+      max_length: 5
+      description: "Weather station / airport IATA code"
+
+    - name: observation_time
+      type: timestamp
+      required: true
+      description: "Time of observation"
+
+    - name: temp_c
+      type: double
+      required: false
+      min_value: -80
+      max_value: 60
+      description: "Temperature in Celsius"
+
+    - name: wind_speed_kt
+      type: integer
+      required: false
+      min_value: 0
+      max_value: 200
+      description: "Wind speed in knots"
+
+    - name: wind_gust_kt
+      type: integer
+      required: false
+      min_value: 0
+      max_value: 300
+      description: "Wind gust speed in knots"
+
+    - name: visibility_statute_mi
+      type: double
+      required: false
+      min_value: 0
+      max_value: 50
+      description: "Visibility in statute miles"
+
+    - name: flight_category
+      type: string
+      required: true
+      allowed_values: [VFR, MVFR, IFR, LIFR]
+      description: "Flight category"
+
+    - name: sky_cover
+      type: string
+      required: false
+      allowed_values: [CLR, FEW, SCT, BKN, OVC]
+      description: "Sky cover"
+
+    - name: precip_in
+      type: double
+      required: false
+      min_value: 0
+      max_value: 20
+      description: "Precipitation in inches"
+
+quality_rules:
+  - name: gust_exceeds_wind
+    rule: "wind_gust_kt IS NULL OR wind_gust_kt >= wind_speed_kt"
+    severity: warning
+    description: "Wind gust should be >= sustained wind speed"
+
+  - name: valid_temperature
+    rule: "temp_c IS NULL OR temp_c BETWEEN -80 AND 60"
+    severity: error
+    description: "Temperature must be in valid range"
+
+freshness:
+  max_delay_minutes: 30
+  description: "Weather observations should arrive within 30 minutes"

@@ -1,0 +1,88 @@
+contract:
+  name: flight_event
+  version: "1.0"
+  description: "Data contract for streaming flight lifecycle events"
+  owner: data-engineering
+  source_system: streaming_flight_events
+
+schema:
+  fields:
+    - name: event_id
+      type: string
+      required: true
+      description: "Unique event identifier"
+
+    - name: flight_id
+      type: string
+      required: true
+      description: "Flight instance identifier"
+
+    - name: flight_number
+      type: string
+      required: true
+      description: "Airline flight number"
+
+    - name: airline
+      type: string
+      required: true
+      max_length: 3
+      description: "IATA airline code"
+
+    - name: event_type
+      type: string
+      required: true
+      allowed_values:
+        - FLIGHT_SCHEDULED
+        - BOARDING_STARTED
+        - BOARDING_COMPLETED
+        - DEPARTURE
+        - TAKEOFF
+        - LANDING
+        - ARRIVAL
+        - DELAY
+        - CANCELLATION
+        - GATE_CHANGE
+      description: "Type of flight lifecycle event"
+
+    - name: airport_code
+      type: string
+      required: true
+      max_length: 5
+      description: "Airport IATA code where event occurred"
+
+    - name: event_time
+      type: timestamp
+      required: true
+      description: "Time the event occurred"
+
+    - name: origin
+      type: string
+      required: true
+      description: "Origin airport IATA code"
+
+    - name: destination
+      type: string
+      required: true
+      description: "Destination airport IATA code"
+
+    - name: delay_minutes
+      type: integer
+      required: false
+      min_value: 0
+      max_value: 1440
+      description: "Cumulative delay in minutes"
+
+quality_rules:
+  - name: origin_not_equal_dest
+    rule: "origin != destination"
+    severity: error
+    description: "Origin and destination must differ"
+
+  - name: delay_only_for_delay_events
+    rule: "event_type != 'DELAY' OR (delay_minutes IS NOT NULL AND delay_minutes > 0)"
+    severity: warning
+    description: "DELAY events should have positive delay_minutes"
+
+freshness:
+  max_delay_minutes: 10
+  description: "Events should arrive within 10 minutes of occurrence"
