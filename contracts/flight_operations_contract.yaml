@@ -1,0 +1,95 @@
+contract:
+  name: flight_operations
+  version: "1.0"
+  description: "Data contract for batch flight operations data from BTS On-Time Performance"
+  owner: data-engineering
+  source_system: bts_on_time
+
+schema:
+  fields:
+    - name: flight_date
+      type: date
+      required: true
+      description: "Date of the flight"
+
+    - name: reporting_airline
+      type: string
+      required: true
+      max_length: 5
+      description: "IATA airline code"
+
+    - name: flight_number
+      type: string
+      required: true
+      description: "Flight number"
+
+    - name: origin_airport
+      type: string
+      required: true
+      max_length: 5
+      allowed_values_ref: "airline_ops.bronze.airports_raw.iata_code"
+      description: "Origin airport IATA code"
+
+    - name: dest_airport
+      type: string
+      required: true
+      max_length: 5
+      description: "Destination airport IATA code"
+
+    - name: tail_number
+      type: string
+      required: false
+      description: "Aircraft tail number"
+
+    - name: dep_delay_minutes
+      type: double
+      required: false
+      min_value: -60
+      max_value: 1440
+      description: "Departure delay in minutes"
+
+    - name: arr_delay_minutes
+      type: double
+      required: false
+      min_value: -60
+      max_value: 1440
+      description: "Arrival delay in minutes"
+
+    - name: cancelled
+      type: integer
+      required: true
+      allowed_values: [0, 1]
+      description: "1 if flight was cancelled"
+
+    - name: diverted
+      type: integer
+      required: true
+      allowed_values: [0, 1]
+      description: "1 if flight was diverted"
+
+    - name: distance_miles
+      type: double
+      required: false
+      min_value: 0
+      max_value: 15000
+      description: "Flight distance in miles"
+
+quality_rules:
+  - name: origin_not_equal_dest
+    rule: "origin_airport != dest_airport"
+    severity: error
+    description: "Origin and destination must be different"
+
+  - name: valid_delay_range
+    rule: "dep_delay_minutes IS NULL OR dep_delay_minutes BETWEEN -60 AND 1440"
+    severity: warning
+    description: "Departure delay should be within reasonable range"
+
+  - name: cancelled_has_no_arrival
+    rule: "cancelled = 0 OR arr_delay_minutes IS NULL"
+    severity: warning
+    description: "Cancelled flights should not have arrival delay"
+
+freshness:
+  max_delay_hours: 24
+  description: "Data should arrive within 24 hours of flight date"
