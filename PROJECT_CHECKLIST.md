@@ -6,37 +6,37 @@
 - [x] Create high-level design
 - [x] Create low-level design
 - [x] Create Bronze, Silver, and Gold DDL
-- [x] Create raw source datasets
-- [x] Create both CSV and JSONL raw formats
+- [x] Create raw source datasets (CSV + JSONL)
 - [x] Build reusable raw data generator
-- [x] Push current project foundation to private GitHub repo
-- [x] Build Bronze ingestion helper for CSV and JSONL
-- [x] Add notebook-ready Bronze ingestion example
-- [x] Create Silver transformation folder and starter logic
-- [x] Create Gold transformation folder and starter logic
+- [x] Push project foundation to private GitHub repo
+- [x] Build Bronze ingestion helper
+- [x] Add notebook-ready Bronze, Silver, and Gold examples
+- [x] Create Silver and Gold transformation logic
+- [x] Create sample validation and reconciliation queries
+- [x] Add rollback / recovery mechanism for failed jobs
+- [x] Add schema evolution handling
+- [x] Add audit logging for each pipeline run
+- [x] Add idempotent re-run behavior for Bronze ingestion
+- [x] Add failure alerting / error reporting strategy
+- [x] Build CDC ingestion module
+- [x] Build SCD (Type 1 / Type 2) processor
+- [x] Build data contract validator
+- [x] Build Spark Structured Streaming (ingestion, Silver, Gold)
+- [x] Build event simulators (flights, weather, CDC)
+- [x] Build GenAI RAG pipeline over airline docs
+- [x] Build Text-to-SQL with safety validation
+- [x] Build Airline Copilot (unified assistant)
+- [x] Build Incident Root-Cause Assistant
+- [x] Reorganize repo into pipeline/, streaming/, genai/ structure
+- [x] Rewrite README with full project scope
 
 ## Pending
 
 - [ ] Run Bronze ingestion in Databricks and validate row counts
-- [ ] Run and validate Silver transformation layer in Databricks
+- [ ] Run and validate Silver and Gold layers in Databricks
 - [ ] Build quarantine and data quality logic
-- [ ] Run and validate Gold transformation layer in Databricks
-- [x] Create sample validation and reconciliation queries
+- [ ] Add row-count and data-quality gate checks between layers
 - [ ] Create Databricks workflow design
 - [ ] Create Power BI dashboard
 - [ ] Capture project screenshots and proof for resume/GitHub
-- [ ] Update GitHub repo documentation with execution steps and outputs
-
-## Reliability and Change Handling
-
-- [x] Add rollback / recovery mechanism for failed jobs
-- [x] Add schema evolution handling for incoming column additions
-- [x] Add audit logging for each pipeline run
-- [x] Add idempotent re-run behavior for Bronze ingestion
-- [ ] Add row-count and data-quality gate checks between layers
-- [x] Add failure alerting / error reporting strategy
-
-## Optional
-
 - [ ] Deploy on Databricks
-- [ ] Publish or demo Power BI report
