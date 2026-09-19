@@ -4,6 +4,9 @@ Incident Root-Cause Assistant for airline operations.
 Pulls recent pipeline audit logs, delay metrics, and anomaly data
 from the Gold layer, then uses an LLM to produce a root-cause
 analysis and recommended next steps.
+
+Requires: Foundation Model Serving.
+Notebook guard: check genai_enabled widget before running.
 """
 
 from __future__ import annotations

@@ -3,6 +3,9 @@ Text-to-SQL engine for airline_ops Unity Catalog tables.
 
 Takes a natural-language question, builds a SQL query using an LLM,
 validates it against the catalog schema, and executes it on Spark.
+
+Requires: Foundation Model Serving.
+Notebook guard: check genai_enabled widget before running.
 """
 
 from __future__ import annotations
@@ -86,7 +89,7 @@ def generate_sql(
     return sql
 
 
-def ask(
+def text_to_sql_ask(
     spark: SparkSession,
     question: str,
     schemas: Optional[List[str]] = None,

@@ -3,6 +3,9 @@ RAG pipeline over airline operations documents.
 
 Uses Databricks Vector Search to retrieve relevant chunks and a
 Foundation Model Serving endpoint to generate grounded answers.
+
+Requires: Vector Search + Foundation Model Serving.
+Notebook guard: check genai_enabled widget before running.
 """
 
 from __future__ import annotations
@@ -101,7 +104,7 @@ def generate(question: str, context_chunks: List[RetrievedChunk]) -> str:
     return response["choices"][0]["message"]["content"]
 
 
-def ask(question: str, top_k: int = 5) -> RAGResponse:
+def rag_ask(question: str, top_k: int = 5) -> RAGResponse:
     """End-to-end RAG: retrieve chunks then generate an answer."""
     chunks = retrieve(question, top_k=top_k)
     answer = generate(question, chunks)

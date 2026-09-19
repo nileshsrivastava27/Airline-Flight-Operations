@@ -4,6 +4,12 @@ Airline document loader and chunker for the RAG pipeline.
 Reads markdown, PDF, and plain-text airline operations documents,
 splits them into overlapping chunks, and writes them to a Delta table
 so the vector-search index can pick them up.
+
+Requires: Vector Search-capable workspace.
+Notebook guard (add at top of notebook cell before %run):
+    genai_enabled = dbutils.widgets.get("genai_enabled") == "True"
+    if not genai_enabled:
+        dbutils.notebook.exit("GenAI skipped")
 """
 
 from __future__ import annotations
