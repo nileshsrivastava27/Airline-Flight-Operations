@@ -356,6 +356,5 @@ def create_job(spark: SparkSession) -> GoldTransformationJob:
 
 
 if __name__ == "__main__":
-    raise SystemExit(
-        "Import this module from a Databricks notebook and call GoldTransformationJob(spark)."
-    )
+    GoldTransformationJob(spark).run_all()
+    print("Gold transformation complete")

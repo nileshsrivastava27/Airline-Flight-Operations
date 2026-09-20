@@ -37,7 +37,8 @@ PARTITIONED BY (event_date)
 COMMENT 'Bronze layer: raw flight lifecycle events from streaming sources'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact'   = 'true'
+    'delta.autoOptimize.autoCompact'   = 'true',
+    'delta.feature.allowColumnDefaults' = 'supported'
 );
 
 
@@ -71,5 +72,6 @@ PARTITIONED BY (observation_date)
 COMMENT 'Bronze layer: raw weather observations from streaming sources'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact'   = 'true'
+    'delta.autoOptimize.autoCompact'   = 'true',
+    'delta.feature.allowColumnDefaults' = 'supported'
 );

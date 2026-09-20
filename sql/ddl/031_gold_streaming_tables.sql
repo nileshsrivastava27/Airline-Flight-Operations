@@ -29,7 +29,8 @@ PARTITIONED BY (flight_date)
 COMMENT 'Gold layer: real-time flight status board — latest state per flight'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact'   = 'true'
+    'delta.autoOptimize.autoCompact'   = 'true',
+    'delta.feature.allowColumnDefaults' = 'supported'
 );
 
 
@@ -54,5 +55,6 @@ PARTITIONED BY (flight_date)
 COMMENT 'Gold layer: real-time airport operational dashboard metrics'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact'   = 'true'
+    'delta.autoOptimize.autoCompact'   = 'true',
+    'delta.feature.allowColumnDefaults' = 'supported'
 );

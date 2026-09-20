@@ -521,6 +521,5 @@ def create_job(spark: SparkSession) -> SilverTransformationJob:
 
 
 if __name__ == "__main__":
-    raise SystemExit(
-        "Import this module from a Databricks notebook and call SilverTransformationJob(spark)."
-    )
+    SilverTransformationJob(spark).run_all()
+    print("Silver transformation complete")

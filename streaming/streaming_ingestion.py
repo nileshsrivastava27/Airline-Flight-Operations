@@ -13,9 +13,10 @@ Supports two source modes:
 
 from __future__ import annotations
 
+import os
+import sys
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Literal, Optional
 
 from pyspark.sql import DataFrame, SparkSession
@@ -26,8 +27,17 @@ from pyspark.sql.types import (
     StringType,
     StructField,
     StructType,
-    TimestampType,
 )
+
+# Add the pipeline package directory to sys.path so the reliability module
+# can be imported regardless of the working directory or job config.
+try:
+    _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    _PROJECT_ROOT = "/Workspace/Users/nileshsrivastava20@gmail.com/Airline-Flight-Operations"
+_PIPELINE_DIR = os.path.join(_PROJECT_ROOT, "pipeline")
+if _PIPELINE_DIR not in sys.path:
+    sys.path.insert(0, _PIPELINE_DIR)
 
 from databricks_pipeline_reliability import PipelineAuditLogger
 
@@ -194,7 +204,7 @@ class StreamingIngestionJob:
             run_id=self._config.pipeline_run_id,
             batch_id="streaming",
             status="STARTED",
-            details=f"Source: {spec.source_mode}, trigger: {spec.trigger_interval}",
+            details={"source": spec.source_mode, "trigger": spec.trigger_interval},
         )
 
         return query
@@ -217,24 +227,24 @@ class StreamingIngestionJob:
         )
 
     def _read_file_stream(self, spec: StreamingSourceSpec) -> DataFrame:
+        reader = (
+            self._spark
+            .readStream
+            .schema(spec.schema)
+            .option("maxFilesPerTrigger", spec.max_files_per_trigger)
+        )
         try:
             return (
-                self._spark
-                .readStream
+                reader
                 .format("cloudFiles")
                 .option("cloudFiles.format", spec.file_format)
-                .option("cloudFiles.maxFilesPerTrigger", spec.max_files_per_trigger)
                 .option("cloudFiles.schemaLocation", f"{spec.checkpoint_location}/schema")
-                .schema(spec.schema)
                 .load(spec.file_path)
             )
         except Exception:
             return (
-                self._spark
-                .readStream
+                reader
                 .format(spec.file_format)
-                .schema(spec.schema)
-                .option("maxFilesPerTrigger", spec.max_files_per_trigger)
                 .load(spec.file_path)
             )
 
@@ -242,52 +252,45 @@ class StreamingIngestionJob:
         if spec.source_mode == "kafka":
             parsed = (
                 stream_df
-                .selectExpr("CAST(value AS STRING) as json_value",
-                            "topic as kafka_topic",
-                            "partition as kafka_partition",
-                            "offset as kafka_offset")
                 .select(
-                    F.from_json(F.col("json_value"), spec.schema).alias("data"),
-                    F.col("kafka_topic"),
-                    F.col("kafka_partition"),
-                    F.col("kafka_offset"),
+                    F.from_json(F.col("value").cast("string"), spec.schema).alias("data"),
+                    F.col("topic").alias("kafka_topic"),
+                    F.col("partition").alias("kafka_partition"),
+                    F.col("offset").alias("kafka_offset"),
                 )
                 .select("data.*", "kafka_topic", "kafka_partition", "kafka_offset")
             )
         else:
-            parsed = stream_df
-            for col_name in ["kafka_topic", "kafka_partition", "kafka_offset"]:
-                if col_name not in parsed.columns:
-                    parsed = parsed.withColumn(col_name, F.lit(None))
+            parsed = stream_df.withColumns({
+                "kafka_topic": F.lit(None),
+                "kafka_partition": F.lit(None),
+                "kafka_offset": F.lit(None),
+            })
 
-        enriched = (
-            parsed
-            .withColumn("source_system", F.lit(f"streaming_{spec.name}"))
-            .withColumn("ingestion_timestamp", F.current_timestamp())
-            .withColumn("batch_id", F.lit(self._config.pipeline_run_id))
-        )
+        # Build all enrichment columns in a single pass to avoid nested plans
+        schema_field_names = {f.name for f in spec.schema.fields}
+        enrich_cols = {
+            "source_system": F.lit(f"streaming_{spec.name}"),
+            "ingestion_timestamp": F.current_timestamp(),
+        }
 
-        if spec.watermark_column in enriched.columns:
-            enriched = enriched.withColumn(
-                spec.watermark_column,
-                F.to_timestamp(F.col(spec.watermark_column))
+        if spec.watermark_column in schema_field_names:
+            enrich_cols[spec.watermark_column] = F.to_timestamp(
+                F.col(spec.watermark_column)
             )
 
         if spec.name == "flight_events":
-            enriched = (
-                enriched
-                .withColumn("event_date", F.to_date(F.col("event_time")))
-                .withColumn("scheduled_departure",
-                            F.to_timestamp(F.col("scheduled_departure")))
-                .withColumn("scheduled_arrival",
-                            F.to_timestamp(F.col("scheduled_arrival")))
+            enrich_cols["event_date"] = F.to_date(F.col("event_time"))
+            enrich_cols["scheduled_departure"] = F.to_timestamp(
+                F.col("scheduled_departure")
+            )
+            enrich_cols["scheduled_arrival"] = F.to_timestamp(
+                F.col("scheduled_arrival")
             )
         elif spec.name == "weather_updates":
-            enriched = enriched.withColumn(
-                "observation_date", F.to_date(F.col("observation_time"))
-            )
+            enrich_cols["observation_date"] = F.to_date(F.col("observation_time"))
 
-        return enriched
+        return parsed.withColumns(enrich_cols)
 
     def _write_micro_batch(
         self, batch_df: DataFrame, batch_id: int, spec: StreamingSourceSpec
@@ -295,10 +298,11 @@ class StreamingIngestionJob:
         micro_batch_id = f"{self._config.pipeline_run_id}_mb{batch_id}"
         row_count = batch_df.count()
 
+        batch_df = batch_df.withColumn("batch_id", F.lit(micro_batch_id))
+
         try:
             (
                 batch_df
-                .withColumn("batch_id", F.lit(micro_batch_id))
                 .write
                 .format("delta")
                 .mode("append")
@@ -314,7 +318,7 @@ class StreamingIngestionJob:
                 batch_id=micro_batch_id,
                 status="SUCCESS",
                 rows_written=row_count,
-                details=f"Micro-batch {batch_id}",
+                details={"micro_batch": batch_id},
             )
         except Exception as exc:
             self._logger.log_event(

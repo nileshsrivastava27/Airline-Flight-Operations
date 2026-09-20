@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS airline_ops.audit.pipeline_run_log (
     status STRING,
     rows_written BIGINT,
     rows_removed BIGINT,
+    rows_rescued BIGINT,
     restored_version BIGINT,
     error_message STRING,
     details STRING
