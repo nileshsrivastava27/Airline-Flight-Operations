@@ -32,7 +32,8 @@ PARTITIONED BY (event_date)
 COMMENT 'Silver layer: cleaned and validated flight lifecycle events'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact'   = 'true'
+    'delta.autoOptimize.autoCompact'   = 'true',
+    'delta.feature.allowColumnDefaults' = 'supported'
 );
 
 
@@ -63,5 +64,6 @@ PARTITIONED BY (observation_date)
 COMMENT 'Silver layer: cleaned and enriched weather observations from streaming'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact'   = 'true'
+    'delta.autoOptimize.autoCompact'   = 'true',
+    'delta.feature.allowColumnDefaults' = 'supported'
 );

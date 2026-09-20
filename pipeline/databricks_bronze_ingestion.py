@@ -85,7 +85,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.flight_operations_raw",
                 source_system="synthetic_airline_ops",
                 source_file_extension=".csv",
-                options={"header": "true", "inferSchema": "true"},
+                options={"header": "true", "inferSchema": "true", "escape": "\""},
                 rejected_table="airline_ops.bronze.flight_operations_rejected",
             ),
             DatasetSpec(
@@ -95,7 +95,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.airports_raw",
                 source_system="synthetic_airports",
                 source_file_extension=".csv",
-                options={"header": "true", "inferSchema": "true"},
+                options={"header": "true", "inferSchema": "true", "escape": "\""},
                 rejected_table="airline_ops.bronze.airports_rejected",
             ),
             DatasetSpec(
@@ -105,7 +105,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.aircraft_reference_raw",
                 source_system="synthetic_aircraft",
                 source_file_extension=".csv",
-                options={"header": "true", "inferSchema": "true"},
+                options={"header": "true", "inferSchema": "true", "escape": "\""},
                 rejected_table="airline_ops.bronze.aircraft_reference_rejected",
             ),
             DatasetSpec(
@@ -115,7 +115,7 @@ def build_default_dataset_specs(data_root: str, variant: SourceVariant = "mixed"
                 target_table="airline_ops.bronze.weather_metar_raw",
                 source_system="synthetic_metar",
                 source_file_extension=".csv",
-                options={"header": "true", "inferSchema": "true"},
+                options={"header": "true", "inferSchema": "true", "escape": "\""},
                 rejected_table="airline_ops.bronze.weather_metar_rejected",
             ),
         ]
@@ -185,6 +185,10 @@ class BronzeIngestionJob:
         self.spark = spark
         self.pipeline_name = pipeline_name
         self.audit_logger = PipelineAuditLogger(spark, audit_table)
+        if spark.catalog.tableExists(audit_table):
+            existing_cols = {f.name for f in spark.table(audit_table).schema.fields}
+            if "rows_rescued" not in existing_cols:
+                spark.sql(f"ALTER TABLE {audit_table} ADD COLUMNS (rows_rescued BIGINT)")
 
     def ingest_all(
         self,
@@ -212,6 +216,11 @@ class BronzeIngestionJob:
             run_id=run_id,
             batch_id=batch_id,
             status="STARTED",
+            rows_written=0,
+            rows_removed=0,
+            rows_rescued=0,
+            restored_version=0,
+            error_message="",
             details={"source_path": spec.source_path, "source_format": spec.source_format},
         )
 
@@ -260,6 +269,8 @@ class BronzeIngestionJob:
                 rows_written=row_count,
                 rows_removed=rows_removed,
                 rows_rescued=rows_rescued,
+                restored_version=0,
+                error_message="",
                 details={
                     "evolved_columns": evolved_columns,
                     "batch_ids": list(batch_ids),
@@ -294,7 +305,10 @@ class BronzeIngestionJob:
                 run_id=run_id,
                 batch_id=batch_id,
                 status="FAILED",
-                restored_version=restored_version,
+                rows_written=0,
+                rows_removed=0,
+                rows_rescued=0,
+                restored_version=restored_version if restored_version is not None else 0,
                 error_message=str(exc),
                 details={"restored_rejected_version": restored_rejected_version},
             )
@@ -424,6 +438,8 @@ def create_job(spark: SparkSession) -> BronzeIngestionJob:
 
 
 if __name__ == "__main__":
-    raise SystemExit(
-        "Import this module from a Databricks notebook and call BronzeIngestionJob(spark)."
-    )
+    data_root = "/Workspace/Users/nileshsrivastava20@gmail.com/Airline-Flight-Operations"
+    specs = build_default_dataset_specs(data_root, variant="mixed")
+    job = BronzeIngestionJob(spark)
+    results = job.ingest_all(specs, batch_id="batch_001")
+    print(f"Bronze ingestion complete: {len(results)} datasets processed")

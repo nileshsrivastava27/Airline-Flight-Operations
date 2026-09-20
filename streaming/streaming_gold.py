@@ -11,6 +11,8 @@ upsert semantics.
 
 from __future__ import annotations
 
+import os
+import sys
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
@@ -18,6 +20,16 @@ from typing import Optional
 from delta.tables import DeltaTable
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+
+# Add the pipeline package directory to sys.path so the reliability module
+# can be imported regardless of the working directory or job config.
+try:
+    _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    _PROJECT_ROOT = "/Workspace/Users/nileshsrivastava20@gmail.com/Airline-Flight-Operations"
+_PIPELINE_DIR = os.path.join(_PROJECT_ROOT, "pipeline")
+if _PIPELINE_DIR not in sys.path:
+    sys.path.insert(0, _PIPELINE_DIR)
 
 from databricks_pipeline_reliability import PipelineAuditLogger
 

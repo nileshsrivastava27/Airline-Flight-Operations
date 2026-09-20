@@ -51,6 +51,29 @@ class PipelineAuditLogger:
         if not self.spark.catalog.tableExists(self.audit_table):
             return
 
+        from pyspark.sql.types import (
+            LongType,
+            StringType,
+            StructField,
+            StructType,
+        )
+
+        audit_schema = StructType([
+            StructField("event_timestamp", StringType()),
+            StructField("pipeline_name", StringType()),
+            StructField("stage_name", StringType()),
+            StructField("target_table", StringType()),
+            StructField("run_id", StringType()),
+            StructField("batch_id", StringType()),
+            StructField("status", StringType()),
+            StructField("rows_written", LongType()),
+            StructField("rows_removed", LongType()),
+            StructField("rows_rescued", LongType()),
+            StructField("restored_version", LongType()),
+            StructField("error_message", StringType()),
+            StructField("details", StringType()),
+        ])
+
         payload = {
             "event_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "pipeline_name": pipeline_name,
@@ -66,7 +89,7 @@ class PipelineAuditLogger:
             "error_message": error_message,
             "details": json.dumps(details, sort_keys=True) if details else None,
         }
-        self.spark.createDataFrame([payload]).write.mode("append").saveAsTable(self.audit_table)
+        self.spark.createDataFrame([payload], schema=audit_schema).write.mode("append").saveAsTable(self.audit_table)
 
 
 def get_current_table_version(spark: SparkSession, table_name: str) -> int | None:
